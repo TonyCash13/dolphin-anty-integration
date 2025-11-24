@@ -30,9 +30,7 @@ from typing import Any, Dict, List, Tuple, Optional
 
 # --- Конфиг ---
 CANDIDATE_URLS = [
-    "https://dolphin-anty.com/api/docs/openapi.yaml",
-    "https://dolphin-anty.com/api/docs/v1/openapi.yaml",
-    "https://docs.dolphin-anty-cdn.com/openapi.yaml",
+    "https://docs.dolphin-anty-cdn.com/openapi.yaml"
 ]
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; TypedDict-Generator/1.0)"
