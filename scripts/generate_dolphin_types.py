@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-"""
-Скрипт для генерации типов Dolphin Anty API
-"""
 import requests
 import yaml
 import json
@@ -19,33 +15,30 @@ def generate_dolphin_types():
         # Скачиваем OpenAPI спецификацию
         print(f"📥 Загружаю OpenAPI спецификацию из {openapi_url}...")
         response = requests.get(openapi_url, timeout=30)
+
+        # Детальная диагностика
+        print(f"🔍 Статус ответа: {response.status_code}")
+        print(f"🔍 Content-Type: {response.headers.get('content-type')}")
+        print(f"🔍 Размер ответа: {len(response.text)} символов")
+
         response.raise_for_status()
 
-        print(f"✅ Статус: {response.status_code}")
-        print(f"📄 Content-Type: {response.headers.get('content-type')}")
-
-        # Проверяем что это действительно YAML
+        # Проверяем что это YAML
         content = response.text
-        print(f"🔍 Первые 100 символов: {content[:100]}...")
+        if not content.strip():
+            print("❌ Пустой ответ от сервера")
+            return False
 
-        # Пробуем разные варианты парсинга
-        openapi_spec = None
+        print(f"🔍 Первые 200 символов: {content[:200]}...")
 
-        # Вариант 1: Пробуем парсить как YAML
-        try:
-            openapi_spec = yaml.safe_load(content)
-            print("✅ Успешно распарсено как YAML")
-        except yaml.YAMLError as e:
-            print(f"❌ Не YAML: {e}")
+        # Парсим YAML
+        openapi_spec = yaml.safe_load(content)
 
-            # Вариант 2: Может быть это JSON?
-            try:
-                openapi_spec = json.loads(content)
-                print("✅ Успешно распарсено как JSON")
-            except json.JSONDecodeError as e2:
-                print(f"❌ Не JSON: {e2}")
-                print("📝 Создаю базовые типы...")
-                return create_basic_types()
+        if not openapi_spec:
+            print("❌ Не удалось распарсить YAML")
+            return False
+
+        print("✅ OpenAPI спецификация успешно загружена и распарсена")
 
         # Сохраняем временный файл в JSON
         temp_file = "openapi_temp.json"
@@ -65,56 +58,23 @@ def generate_dolphin_types():
             os.remove(temp_file)
 
         if result.returncode == 0:
-            print("✅ Типы Dolphin Anty API успешно сгенерированы!")
+            print("✅ Типы Dolphin Anty API успешно сгенерированы из OpenAPI!")
+
+            # Добавляем сгенерированные файлы в git
             subprocess.run(["git", "add", "src/types/dolphin-api.ts"], check=False)
+            subprocess.run(["git", "add", "src/types/python_types.py"], check=False)
+
             return True
         else:
-            print(f"❌ Ошибка генерации типов: {result.stderr}")
-            return create_basic_types()
+            print(f"❌ Ошибка генерации TypeScript типов: {result.stderr}")
+            return False
 
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Ошибка загрузки: {e}")
-        return create_basic_types()
+    except yaml.YAMLError as e:
+        print(f"❌ Ошибка парсинга YAML: {e}")
+        return False
+    except subprocess.TimeoutExpired:
+        print("❌ Таймаут генерации типов")
+        return False
     except Exception as e:
         print(f"❌ Неожиданная ошибка: {e}")
-        return create_basic_types()
-
-def create_basic_types():
-    """Создает базовые типы вручную"""
-    basic_types = """/**
- * Базовые типы Dolphin Anty API
- * Сгенерировано автоматически
- */
-
-export interface Profile {
-  id?: number;
-  name?: string;
-  browser?: string;
-  os?: string;
-  userAgent?: string;
-}
-
-export interface CreateProfileRequest {
-  name: string;
-  browser: string;
-  os?: string;
-}
-
-export interface APIResponse<T = any> {
-  data?: T;
-  error?: string;
-  success: boolean;
-}
-"""
-
-    os.makedirs("src/types", exist_ok=True)
-    with open("src/types/dolphin-api.ts", "w", encoding="utf-8") as f:
-        f.write(basic_types)
-
-    print("✅ Базовые типы созданы вручную")
-    subprocess.run(["git", "add", "src/types/dolphin-api.ts"], check=False)
-    return True
-
-if __name__ == "__main__":
-    success = generate_dolphin_types()
-    sys.exit(0 if success else 1)
+        return False
